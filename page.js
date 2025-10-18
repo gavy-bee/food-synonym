@@ -1,15 +1,17 @@
+'use client'
+
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
-import { Loader2, Upload } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
-export default function FoodSynonymLocal() {
+export default function FoodSynonymPage() {
   const [foods, setFoods] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedFood, setSelectedFood] = useState(null)
 
+  // CSV 파일 업로드
   const handleFileUpload = (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -20,61 +22,63 @@ export default function FoodSynonymLocal() {
       const lines = text.split('\n').filter(Boolean)
       const data = lines.map((line, i) => {
         const [id, name, updated] = line.split(',')
-        return { id: id?.trim() || `F${1000 + i}`, name: name?.trim(), updated_at: updated?.trim() || '', synonyms: [] }
+        return {
+          id: id?.trim() || `F${1000 + i}`,
+          name: name?.trim(),
+          updated_at: updated?.trim() || '',
+          synonyms: [],
+        }
       })
       setFoods(data)
     }
     reader.readAsText(file)
   }
 
-const handleGenerate = async (food) => {
-  setLoading(true)
-  setSelectedFood(food.id)
+  // 실제 OpenAI API 연동
+  const handleGenerate = async (food) => {
+    setLoading(true)
+    setSelectedFood(food.id)
 
-  try {
-    const res = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        foodName: food.name,
-        prompt: '식품명에 대한 유의어를 5개 생성해 주세요'
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          foodName: food.name,
+          prompt: '식품명에 대한 유의어를 5개 생성해 주세요',
+        }),
       })
-    })
 
-    const data = await res.json()
+      const data = await res.json()
 
-    if (data.text) {
-      // text에서 숫자 리스트 추출
-      const lines = data.text
-        .split('\n')
-        .map((l) => l.replace(/^[0-9.\s-]+/, '').trim())
-        .filter((l) => l && !l.includes('유의어'))
+      if (data.text) {
+        const lines = data.text
+          .split('\n')
+          .map((l) => l.replace(/^[0-9.\s-]+/, '').trim())
+          .filter((l) => l && !l.includes('유의어'))
 
-      const newSynonyms = lines.map((s) => ({
-        synonym: s,
-        type: 'AI 생성 결과',
-      }))
+        const newSynonyms = lines.map((s) => ({
+          synonym: s,
+          type: 'AI 생성 결과',
+        }))
 
-      setFoods((prev) =>
-        prev.map((f) =>
-          f.id === food.id ? { ...f, synonyms: newSynonyms } : f
+        setFoods((prev) =>
+          prev.map((f) => (f.id === food.id ? { ...f, synonyms: newSynonyms } : f))
         )
-      )
-    } else {
-      alert(data.error || '응답이 비어 있습니다.')
+      } else {
+        alert(data.error || '응답이 비어 있습니다.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('API 요청 중 오류 발생')
+    } finally {
+      setLoading(false)
     }
-  } catch (err) {
-    console.error(err)
-    alert('API 요청 중 오류 발생')
-  } finally {
-    setLoading(false)
   }
-}
-
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">📁 실제 CSV 데이터 기반 식품 유의어 생성</h1>
+      <h1 className="text-2xl font-bold">📁 실제 CSV 기반 식품 유의어 생성</h1>
 
       <Card>
         <CardHeader>

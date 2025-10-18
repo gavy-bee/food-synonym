@@ -27,23 +27,50 @@ export default function FoodSynonymLocal() {
     reader.readAsText(file)
   }
 
-  const handleGenerate = (food) => {
-    setLoading(true)
-    setSelectedFood(food.id)
-    // 임시 LLM 생성 결과 시뮬레이션
-    setTimeout(() => {
-      const newSynonyms = [
-        { synonym: food.name + '변형', type: '단순 치환/동의어' },
-        { synonym: food.name.slice(0, 2), type: '축약/별칭' },
-        { synonym: food.name + '조림', type: '세부 정보 추가' },
-        { synonym: food.name.split('').reverse().join(''), type: '어순 변경' },
-      ]
+const handleGenerate = async (food) => {
+  setLoading(true)
+  setSelectedFood(food.id)
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        foodName: food.name,
+        prompt: '식품명에 대한 유의어를 5개 생성해 주세요'
+      })
+    })
+
+    const data = await res.json()
+
+    if (data.text) {
+      // text에서 숫자 리스트 추출
+      const lines = data.text
+        .split('\n')
+        .map((l) => l.replace(/^[0-9.\s-]+/, '').trim())
+        .filter((l) => l && !l.includes('유의어'))
+
+      const newSynonyms = lines.map((s) => ({
+        synonym: s,
+        type: 'AI 생성 결과',
+      }))
+
       setFoods((prev) =>
-        prev.map((f) => (f.id === food.id ? { ...f, synonyms: newSynonyms } : f))
+        prev.map((f) =>
+          f.id === food.id ? { ...f, synonyms: newSynonyms } : f
+        )
       )
-      setLoading(false)
-    }, 1200)
+    } else {
+      alert(data.error || '응답이 비어 있습니다.')
+    }
+  } catch (err) {
+    console.error(err)
+    alert('API 요청 중 오류 발생')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   return (
     <div className="p-6 space-y-6">
